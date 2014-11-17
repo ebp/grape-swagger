@@ -172,6 +172,7 @@ module Grape
 
               basePath                   = parse_base_path(base_path, request)
               api_description[:basePath] = basePath if basePath && basePath.size > 0
+              models                     = models_with_included_presenters(models)
               api_description[:models]   = parse_entity_models(models) unless models.empty?
 
               api_description
@@ -307,6 +308,26 @@ module Grape
               end
 
               result
+            end
+
+            def models_with_included_presenters(models)
+              all_models = models
+
+              models.each do |model|
+                properties = model.exposures
+                documented_properties = {}
+
+                model.documentation.keys.each_with_object(documented_properties) do |k, hash|
+                  hash[k] = properties[k] if properties.key?(k)
+                end
+
+                properties_configuration = documented_properties.values
+                additional_models = properties_configuration.map { |config| config[:using] }.compact
+
+                all_models += additional_models
+              end
+
+              all_models
             end
 
             def parse_http_codes codes
