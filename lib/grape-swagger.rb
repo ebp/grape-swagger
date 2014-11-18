@@ -153,7 +153,19 @@ module Grape
                     :parameters => parse_header_params(route.route_headers) +
                       parse_params(route.route_params, route.route_path, route.route_method)
                   }
-                  operation.merge!(:type => parse_entity_name(route.route_entity)) if route.route_entity
+
+                  if route.route_entity
+                    type = parse_entity_name(route.route_entity)
+                    if route.instance_variable_get(:@options)[:is_array]
+                      operation.merge!(
+                        'type' => 'array',
+                        'items' => generate_typeref(type)
+                      )
+                    else
+                      operation.merge!('type' => type)
+                    end
+                  end
+
                   operation.merge!(:responseMessages => http_codes) unless http_codes.empty?
                   operation
                 end.compact
@@ -180,6 +192,19 @@ module Grape
           end
 
           helpers do
+
+            def generate_typeref(type)
+              type = type.to_s.sub(/^[A-Z]/) { |f| f.downcase } if type.is_a?(Class)
+              if is_primitive? type
+                { 'type' => type }
+              else
+                { '$ref' => type }
+              end
+            end
+
+            def is_primitive?(type)
+              %w(integer long float double string byte boolean date dateTime).include? type
+            end
 
             def as_markdown(description)
               description && @@markdown ? Kramdown::Document.new(strip_heredoc(description), :input => 'GFM', :enable_coderay => false).to_html : description
