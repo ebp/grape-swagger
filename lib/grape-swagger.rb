@@ -322,12 +322,29 @@ module Grape
                 properties  = {}
 
                 model.documentation.each do |property_name, property_info|
-                  properties[property_name] = property_info
+                  p = property_info.dup
+
+                  required << property_name.to_s if p.delete(:required)
+
+                  if p.delete(:is_array)
+                    p[:items] = generate_typeref(p[:type])
+                    p[:type] = 'array'
+                  else
+                    p.merge! generate_typeref(p.delete(:type))
+                  end
 
                   # rename Grape Entity's "desc" to "description"
-                  if property_description = property_info.delete(:desc)
-                    property_info[:description] = property_description
+                  property_description = p.delete(:desc)
+                  p[:description] = property_description if property_description
+
+                  # rename Grape's 'values' to 'enum'
+                  select_values = p.delete(:values)
+                  if select_values
+                    select_values = select_values.call if select_values.is_a?(Proc)
+                    p[:enum] = select_values
                   end
+
+                  properties[property_name] = p
                 end
 
                 result[name] = {
